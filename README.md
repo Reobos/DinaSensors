@@ -1,6 +1,31 @@
 # DinaSensors
 
-Local MQTT and OSC Server for Dinacon 2025
+Sensors and Server for Dinacon 2025
+
+## Smell Sensor Setup
+
+The sample code is for ESP32 Arduino platform.io project publishing to a local MQTT server. A bunch of gas and atmospheric sensors are currently published to topics.
+
+Below is a table of configuration for the local server. You can subscribe to the topics, which are currently published every 2 seconds. You can configure the publish rate or process the data however you want! Check out the source code at [src/dina_smell.cpp](src/dina_smell.cpp). This can also serve as a nice template for adding other sensors and publishing to MQTT.
+
+
+| Setting                | Value                        |
+|------------------------|------------------------------|
+| **WiFi SSID**          | DinaCam                      |
+| **WiFi Password**      | bigheadsim                   |
+| **MQTT Server**        | 192.168.8.174                |
+| **MQTT Port**          | 1883                         |
+| **MQTT Username**      | dinacam                      |
+| **MQTT Password**      | bigheadsim                   |
+| **MQTT Topic (Temp)**  | dinacam/feeds/dinasmell.temp |
+| **MQTT Topic (Humd)**  | dinacam/feeds/dinasmell.humd |
+| **MQTT Topic (Pres)**  | dinacam/feeds/dinasmell.pres |
+| **MQTT Topic (CO₂)**   | dinacam/feeds/dinasmell.co2  |
+| **MQTT Topic (VOC1)**  | dinacam/feeds/dinasmell.voc1 |
+| **MQTT Topic (VOC2)**  | dinacam/feeds/dinasmell.voc2 |
+| **MQTT Topic (NO₂)**   | dinacam/feeds/dinasmell.no2  |
+| **MQTT Topic (Eth)**   | dinacam/feeds/dinasmell.eth  |
+| **MQTT Topic (CO)**    | dinacam/feeds/dinasmell.co   |
 
 ## Mosquitto (MQTT) Setup
 
