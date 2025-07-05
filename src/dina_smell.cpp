@@ -9,6 +9,9 @@
 #include "sensirion_common.h"
 #include "sgp30.h"
 
+// Uncomment to print data every sensor read
+// #define PRINT_SERIAL
+
 // WIFI
 #define WIFI_SSID "DinaCam"
 #define WIFI_PASS "bigheadsim"
@@ -34,15 +37,19 @@
 #define BME680_I2C_ADDR uint8_t(0x76) // I2C address of BME680
 #define PA_IN_KPA 1000.0              // Convert Pa to KPa
 
-// Sampling timing
-#define SAMPLING_PERIOD_MS 2000 // Sampling period (ms)
+// Publish rate timing
+#define SAMPLING_PERIOD_MS 2000 // 2 second publish period (ms)
 
 // Global objects
 GAS_GMXXX<TwoWire> gas;               // Multichannel gas sensor v2
 Seeed_BME680 bme680(BME680_I2C_ADDR);
 
+// Wifi and MQTT
 WiFiClient espClient;
 PubSubClient client(espClient);
+
+// Timing
+uint32_t start_time;
 
 void setup_wifi() {
     delay(10);
@@ -54,7 +61,11 @@ void setup_wifi() {
 
 void reconnect() {
     while (!client.connected()) {
-        if (client.connect("DinaSmellClient", MQTT_USER, MQTT_PASS)) {
+        // Create a random client ID
+        randomSeed(micros());
+        String clientId = MQTT_CLIENT;
+        clientId += String(random(0xffff), HEX);
+        if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASS)) {
             // Connected
         } else {
             delay(5000);
@@ -108,13 +119,14 @@ void setup() {
     // ethyl alcohol and h2 initial read
     uint16_t sgp_eth;
     uint16_t sgp_h2;
-    int16_t sgp_err = sgp_measure_signals_blocking_read(&sgp_eth, &sgp_h2);
-    if (sgp_err != STATUS_OK)
+    while (sgp_measure_signals_blocking_read(&sgp_eth, &sgp_h2) != STATUS_OK)
     {
         Serial.println("Error: Could not read signal from SGP30");
-        while (1)
-            ;
+        delay(1000);
     }
+
+    // set start time
+    start_time = millis();
 }
 
 void read_smell_sensors()
@@ -142,39 +154,41 @@ void read_smell_sensors()
         return;
     }
 
+    // Publish to MQTT
     client.publish(MQTT_TOPIC_SMELL_temp, String(bme680.sensor_result_value.humidity).c_str(), true);
     client.publish(MQTT_TOPIC_SMELL_humd, String(bme680.sensor_result_value.humidity).c_str(), true);
     client.publish(MQTT_TOPIC_SMELL_pres, String(bme680.sensor_result_value.pressure / PA_IN_KPA).c_str(), true);
-
     client.publish(MQTT_TOPIC_SMELL_no2, String(gm_no2_v).c_str(), true);
     client.publish(MQTT_TOPIC_SMELL_eth, String(gm_eth_v).c_str(), true);
     client.publish(MQTT_TOPIC_SMELL_voc2, String(gm_voc_v).c_str(), true);
     client.publish(MQTT_TOPIC_SMELL_co, String(gm_co_v).c_str(), true);
-
     client.publish(MQTT_TOPIC_SMELL_co2, String(sgp_co2).c_str(), true);
     client.publish(MQTT_TOPIC_SMELL_voc1, String(sgp_tvoc).c_str(), true);
 
-    Serial.println("MQTT published");
-
     // Print CSV data with timestamp
-    Serial.print(bme680.sensor_result_value.temperature);
-    // Serial.print(",");
-    // Serial.print(bme680.sensor_result_value.humidity);
-    Serial.print(",");
-    Serial.print(bme680.sensor_result_value.pressure / PA_IN_KPA);
-    // Serial.print(",");
-    // Serial.print(sgp_co2);
-    // Serial.print(",");
-    // Serial.print(sgp_tvoc);
-    // Serial.print(",");
-    // Serial.print(gm_voc_v);
-    // Serial.print(",");
-    // Serial.print(gm_no2_v);
-    // Serial.print(",");
-    // Serial.print(gm_eth_v);
-    // Serial.print(",");
-    // Serial.print(gm_co_v);
-    // Serial.println();
+    #ifdef PRINT_SERIAL
+        const uint32_t timestamp = millis() - start_time;
+        Serial.print(timestamp);
+        Serial.print(",");
+        Serial.print(bme680.sensor_result_value.temperature);
+        Serial.print(",");
+        Serial.print(bme680.sensor_result_value.humidity);
+        Serial.print(",");
+        Serial.print(bme680.sensor_result_value.pressure / PA_IN_KPA);
+        Serial.print(",");
+        Serial.print(sgp_co2);
+        Serial.print(",");
+        Serial.print(sgp_tvoc);
+        Serial.print(",");
+        Serial.print(gm_voc_v);
+        Serial.print(",");
+        Serial.print(gm_no2_v);
+        Serial.print(",");
+        Serial.print(gm_eth_v);
+        Serial.print(",");
+        Serial.print(gm_co_v);
+        Serial.println();
+    #endif
 
 }
 
@@ -187,13 +201,10 @@ void loop() {
 
     read_smell_sensors();
 
-    // Wait just long enough for our sampling periodn hit our target frequency
+    // Wait just long enough for our sampling period to hit our target frequency
     client.loop();
-    while (millis() < now + SAMPLING_PERIOD_MS);
+    while (millis() < (now + SAMPLING_PERIOD_MS));
     {
-        // wait
         client.loop();
     }
-
-    delay(2000); // Publish every 2 seconds
 }
